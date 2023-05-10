@@ -10,6 +10,7 @@ import (
 )
 
 type userInfo struct {
+	ID       string   `json:"id"`
 	Email    string   `json:"email"`
 	Password string   `json:"password"`
 	Roles    []string `json:"roles"`
@@ -75,5 +76,24 @@ func CreateUserHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte(fmt.Sprintf(`{"message":"New user successfully creadted with ID: %s!"}`, *newUser.ID)))
+	w.Write([]byte(fmt.Sprintf(`{"message":"New user successfully creadted with ID: %s"}`, *newUser.ID)))
+}
+
+func DeleteUser(w http.ResponseWriter, r *http.Request) {
+	var userinfo userInfo
+	err := json.NewDecoder(r.Body).Decode(&userinfo)
+
+	if err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	err = Auth0API.User.Delete(userinfo.ID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	w.Write([]byte(fmt.Sprintf(`{"message":"Successfully deleted user"`)))
 }
