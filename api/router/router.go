@@ -18,8 +18,9 @@ func New() http.Handler {
 		w.Write([]byte(`{"message":"Hello World!"}`))
 	})
 
-	// create a client
+	// user functions
 	r.Post("/create", manager.CreateUserHandler)
+	r.Patch("/addroles", manager.AddRolesHandler)
 
 	return r
 }
