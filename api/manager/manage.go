@@ -74,6 +74,6 @@ func CreateUserHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte(fmt.Sprintf(`{"message":"New user successfully creadted with ID: %s!"}`, *newUser.ID)))
 }
