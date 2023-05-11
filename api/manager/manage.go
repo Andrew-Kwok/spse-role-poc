@@ -132,6 +132,43 @@ func RewriteRoles(userinfo userInfo) []error {
 	return err_accumulator
 }
 
+func RewriteRolesHandler(w http.ResponseWriter, r *http.Request) {
+	var userinfo userInfo
+	err := json.NewDecoder(r.Body).Decode(&userinfo)
+
+	if err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	if userinfo.ID == "" {
+		http.Error(w, "user id cannot be empty", http.StatusBadRequest)
+		return
+	}
+
+	old_roles, err := Auth0API.User.Roles(userinfo.ID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	Auth0API.User.RemoveRoles(userinfo.ID, old_roles.Roles)
+	err_list := RewriteRoles(userinfo)
+
+	// parse messages into json
+	var err_list_str []string
+	for _, err := range err_list {
+		err_list_str = append(err_list_str, err.Error())
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(message{
+		Message: "Role Rewriting Successfully Halted. Please pay attention to the \"errors\" scope. You can ignore this message if it is empty.",
+		Errors:  err_list_str,
+	})
+
+}
+
 func AddRolesHandler(w http.ResponseWriter, r *http.Request) {
 	var userinfo userInfo
 	err := json.NewDecoder(r.Body).Decode(&userinfo)

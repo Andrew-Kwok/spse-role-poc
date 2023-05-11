@@ -70,8 +70,12 @@ func testCreateHelper(t *testing.T, data map[string]interface{}, expectedStatus 
 	return ""
 }
 
-func testAddHelper(t *testing.T, data map[string]interface{}, expectedStatus int) {
+func testPatchHelper(t *testing.T, command string, data map[string]interface{}, expectedStatus int) {
 	server := httptest.NewServer(http.HandlerFunc(manager.AddRolesHandler))
+	if command == "rewriteroles" {
+		server = httptest.NewServer(http.HandlerFunc(manager.RewriteRolesHandler))
+	}
+
 	defer server.Close()
 
 	jsonData, err := json.Marshal(data)
@@ -79,7 +83,7 @@ func testAddHelper(t *testing.T, data map[string]interface{}, expectedStatus int
 		t.Fatalf("Failed to marshal JSON data: %v", err)
 	}
 
-	req, err := http.NewRequest("POST", server.URL+"/addroles", bytes.NewBuffer(jsonData))
+	req, err := http.NewRequest("POST", server.URL+"/"+command, bytes.NewBuffer(jsonData))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -218,7 +222,7 @@ func TestAddRoles(t *testing.T) {
 		"id":    uid,
 		"roles": []string{"A1:Admin PPE", "A1:Admin Agency", "A1:Verifikator", "A1:Helpdesk"},
 	}
-	testAddHelper(t, data, http.StatusOK)
+	testPatchHelper(t, "addroles", data, http.StatusOK)
 	checkRoles(t, uid, []string{"A1:Admin PPE", "A1:Admin Agency", "A1:Verifikator", "A1:Helpdesk"})
 
 	// No roles should be added
@@ -226,7 +230,7 @@ func TestAddRoles(t *testing.T) {
 		"id":    uid,
 		"roles": []string{"A1:Admin PP"},
 	}
-	testAddHelper(t, data, http.StatusOK)
+	testPatchHelper(t, "addroles", data, http.StatusOK)
 	checkRoles(t, uid, []string{"A1:Admin PPE", "A1:Admin Agency", "A1:Verifikator", "A1:Helpdesk"})
 
 	// A2:Admin PP should be allowed to be added
@@ -234,7 +238,7 @@ func TestAddRoles(t *testing.T) {
 		"id":    uid,
 		"roles": []string{"A2:PP"},
 	}
-	testAddHelper(t, data, http.StatusOK)
+	testPatchHelper(t, "addroles", data, http.StatusOK)
 	checkRoles(t, uid, []string{"A1:Admin PPE", "A1:Admin Agency", "A1:Verifikator", "A1:Helpdesk", "A2:PP"})
 
 	// A2:KUPBJ should be allowed to be added
@@ -242,7 +246,7 @@ func TestAddRoles(t *testing.T) {
 		"id":    uid,
 		"roles": []string{"A2:KUPBJ"},
 	}
-	testAddHelper(t, data, http.StatusOK)
+	testPatchHelper(t, "addroles", data, http.StatusOK)
 	checkRoles(t, uid, []string{"A1:Admin PPE", "A1:Admin Agency", "A1:Verifikator", "A1:Helpdesk", "A2:PP", "A2:KUPBJ"})
 
 	// A2:PPK should not be allowed to be added since A2:PP exists
@@ -250,7 +254,7 @@ func TestAddRoles(t *testing.T) {
 		"id":    uid,
 		"roles": []string{"A2:PPK"},
 	}
-	testAddHelper(t, data, http.StatusOK)
+	testPatchHelper(t, "addroles", data, http.StatusOK)
 	checkRoles(t, uid, []string{"A1:Admin PPE", "A1:Admin Agency", "A1:Verifikator", "A1:Helpdesk", "A2:PP", "A2:KUPBJ"})
 
 	// A2:Auditor should not be allowed to be added since it has functions in A2:Pelaku Pengadaan LPSE exists
@@ -258,7 +262,7 @@ func TestAddRoles(t *testing.T) {
 		"id":    uid,
 		"roles": []string{"A2:Auditor"},
 	}
-	testAddHelper(t, data, http.StatusOK)
+	testPatchHelper(t, "addroles", data, http.StatusOK)
 	checkRoles(t, uid, []string{"A1:Admin PPE", "A1:Admin Agency", "A1:Verifikator", "A1:Helpdesk", "A2:PP", "A2:KUPBJ"})
 
 	// A3:Auditor should be allowed to be added since it has no functions in A3
@@ -266,8 +270,32 @@ func TestAddRoles(t *testing.T) {
 		"id":    uid,
 		"roles": []string{"A3:Auditor"},
 	}
-	testAddHelper(t, data, http.StatusOK)
+	testPatchHelper(t, "addroles", data, http.StatusOK)
 	checkRoles(t, uid, []string{"A1:Admin PPE", "A1:Admin Agency", "A1:Verifikator", "A1:Helpdesk", "A2:PP", "A2:KUPBJ", "A3:Auditor"})
+}
+
+func TestRewriteRoles(t *testing.T) {
+	setup(t)
+	data := map[string]interface{}{
+		"email":    "__test100@example.com",
+		"password": "Test123!",
+	}
+	uid := testCreateHelper(t, data, http.StatusCreated)
+	defer manager.Auth0API.User.Delete(uid)
+
+	data = map[string]interface{}{
+		"id":    uid,
+		"roles": []string{"A1:Admin PPE", "A1:Admin Agency", "A1:Verifikator", "A1:Helpdesk"},
+	}
+	testPatchHelper(t, "rewriteroles", data, http.StatusOK)
+	checkRoles(t, uid, []string{"A1:Admin PPE", "A1:Admin Agency", "A1:Verifikator", "A1:Helpdesk"})
+
+	data = map[string]interface{}{
+		"id":    uid,
+		"roles": []string{"A1:PPK", "A1:KUPBJ", "A1:Anggota Pokmil", "A3:PP"},
+	}
+	testPatchHelper(t, "rewriteroles", data, http.StatusOK)
+	checkRoles(t, uid, []string{"A1:PPK", "A1:KUPBJ", "A1:Anggota Pokmil", "A3:PP"})
 }
 
 // Extra Utility
