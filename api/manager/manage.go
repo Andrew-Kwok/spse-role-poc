@@ -3,7 +3,6 @@ package manager
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 
@@ -50,16 +49,30 @@ func CreateUserHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	if userinfo.Roles != nil && len(userinfo.Roles) > 0 {
-		userinfo.ID = *newUser.ID
-		err_list := RewriteRoles(userinfo)
-		log.Println(err_list)
-	}
-
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte(fmt.Sprintf(`{"message":"New user successfully creadted with ID: %s"}`, *newUser.ID)))
+
+	var err_list []error = nil
+	if userinfo.Roles != nil && len(userinfo.Roles) > 0 {
+		userinfo.ID = *newUser.ID
+		err_list = RewriteRoles(userinfo)
+	}
+
+	// parse messages into json
+	type message struct {
+		Message string   `"json:message"`
+		Errors  []string `"json:errors"`
+	}
+
+	var err_list_str []string
+	for _, err := range err_list {
+		err_list_str = append(err_list_str, err.Error())
+	}
+
+	json.NewEncoder(w).Encode(message{
+		Message: fmt.Sprintf("New user successfully creaded with ID: %s", *newUser.ID),
+		Errors:  err_list_str,
+	})
 }
 
 func RewriteRoles(userinfo userInfo) []error {

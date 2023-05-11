@@ -19,12 +19,12 @@ func RoleSetup(prefix string) error {
 	Division = make(map[string]string)
 	for div, roles := range Hierarchy {
 		for _, role := range roles {
-			Division[prefix+":"+role] = div
+			Division[role] = div
 		}
 	}
 
 	// TODO: Fix Looping, only requires looping with prefix
-	// Auth0API.Role.List() Returns a list of sorted roles.
+	// Auth0API.Role.List() Returns a list of roles sorted by role_name.
 	rolelist, err := Auth0API.Role.List()
 	if err != nil {
 		return err
@@ -47,7 +47,7 @@ func ValidateRoles(prefix string, roles []string) error {
 	// Division[role] must be the same for all role in roles
 	var div string = ""
 	for _, role := range roles {
-		role_div, ok := Division[prefix+":"+role]
+		role_div, ok := Division[role]
 		if !ok {
 			return errors.New(fmt.Sprintf("Role not found: %s", prefix+":"+role))
 		}

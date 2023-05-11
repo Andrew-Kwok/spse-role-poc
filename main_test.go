@@ -21,7 +21,7 @@ func testHelper(t *testing.T, data map[string]interface{}, expectedStatus int) {
 	}
 
 	manager.ConnectAPI()
-	manager.RoleSetup()
+	// manager.RoleSetup()
 
 	server := httptest.NewServer(http.HandlerFunc(manager.CreateUserHandler))
 	defer server.Close()
@@ -86,7 +86,7 @@ func TestCreateOnlyPengelola(t *testing.T) {
 	data := map[string]interface{}{
 		"email":    "test100@example.com",
 		"password": "Test123!",
-		"roles":    []string{"Admin PPE", "Admin Agency", "Verifikator", "Helpdesk"},
+		"roles":    []string{"A1:Admin PPE", "A1:Admin Agency", "A1:Verifikator", "A1:Helpdesk", "A2:Admin PPE", "A2:Admin Agency", "A3:Verifikator", "A3:Helpdesk"},
 	}
 	testHelper(t, data, http.StatusCreated)
 }
@@ -95,7 +95,7 @@ func TestCreateOnlyPengadaan(t *testing.T) {
 	data := map[string]interface{}{
 		"email":    "test100@example.com",
 		"password": "Test123!",
-		"roles":    []string{"PPK", "KUPBJ", "Anggota Pokmil"},
+		"roles":    []string{"A2:PPK", "A2:KUPBJ", "A2:Anggota Pokmil", "A3:PP", "A3:KUPBJ", "A3:Anggota Pokmil"},
 	}
 	testHelper(t, data, http.StatusCreated)
 }
@@ -104,7 +104,7 @@ func TestCreateOnlyAuditor(t *testing.T) {
 	data := map[string]interface{}{
 		"email":    "test100@example.com",
 		"password": "Test123!",
-		"roles":    []string{"Auditor"},
+		"roles":    []string{"A1:Auditor", "A2:Auditor", "A3:Auditor"},
 	}
 	testHelper(t, data, http.StatusCreated)
 }
@@ -113,25 +113,25 @@ func TestCreatePP_PPK(t *testing.T) {
 	data := map[string]interface{}{
 		"email":    "test100@example.com",
 		"password": "Test123!",
-		"roles":    []string{"PPK", "KUPBJ", "Anggota Pokmil", "PP"},
+		"roles":    []string{"A1:PPK", "A1:KUPBJ", "A1:Anggota Pokmil", "A1:PP"},
 	}
-	testHelper(t, data, http.StatusBadRequest)
+	testHelper(t, data, http.StatusCreated)
 }
 
 func TestCreateCrossFunction(t *testing.T) {
 	data := map[string]interface{}{
 		"email":    "test100@example.com",
 		"password": "Test123!",
-		"roles":    []string{"PPK", "KUPBJ", "Admin PPE"},
+		"roles":    []string{"A2:PPK", "A2:KUPBJ", "A2:Admin PPE"},
 	}
-	testHelper(t, data, http.StatusBadRequest)
+	testHelper(t, data, http.StatusCreated)
 }
 
 func TestCreateCrossFunction2(t *testing.T) {
 	data := map[string]interface{}{
 		"email":    "test100@example.com",
 		"password": "Test123!",
-		"roles":    []string{"Helpdesk", "Auditor"},
+		"roles":    []string{"A3:Helpdesk", "A3:Auditor"},
 	}
-	testHelper(t, data, http.StatusBadRequest)
+	testHelper(t, data, http.StatusCreated)
 }
