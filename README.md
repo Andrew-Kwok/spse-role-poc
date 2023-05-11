@@ -13,4 +13,4 @@ To create a user, send a `GET` request to `localhost:3000/create` with request b
 ```
 
 
-Available roles: `{"Admin PPE", "Admin Agency", "Verifikator", "Helpdesk", "PPK", "KUPBJ", "Anggota Pokmil", "PP", "Auditor"}` 
+Available roles: `{"A1:Admin PPE", "A1:Admin Agency", "A1:Verifikator", "A1:Helpdesk", "A1:PPK", "A1:KUPBJ", "A1:Anggota Pokmil", "A1:PP", "A1:Auditor", "A2:Admin PPE", ..., "A3:Auditor"}` 
