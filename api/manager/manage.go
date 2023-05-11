@@ -242,6 +242,77 @@ func AddRolesHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func QueryAssignHandler(w http.ResponseWriter, r *http.Request) {
+	type queryVar struct {
+		AssignerUID string `json:"assigner_uid"`
+		CreateRole  string `json:"create_role"`
+	}
+	var query queryVar
+	err := json.NewDecoder(r.Body).Decode(&query)
+
+	if err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	if query.CreateRole == "" {
+		http.Error(w, "Assignee UID cannot be empty", http.StatusBadRequest)
+		return
+	}
+
+	idx := strings.Index(query.CreateRole, ":")
+	if idx == -1 {
+		http.Error(w, fmt.Sprintf("Role %s is not in correct format", query.CreateRole), http.StatusBadRequest)
+	}
+
+	satuanKerja, assigneeRole := query.CreateRole[:idx], query.CreateRole[idx+1:]
+	assignerRolelist, err := Auth0API.User.Roles(query.AssignerUID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	left, right := 0, len(assignerRolelist.Roles)-1
+	for left < right {
+		mid := (left + right) >> 1
+		if *assignerRolelist.Roles[mid].Name < satuanKerja+":" {
+			left = mid + 1
+		} else {
+			right = mid
+		}
+	}
+
+	// only PPE and Agency has the power to create other users
+	// PPE can create all but PPE and Auditor
+	// Agency can create all but PPE, Auditor, Agency
+	assignerPPE, assignerAgency := false, false
+	for ; left < len(assignerRolelist.Roles) && strings.HasPrefix(*assignerRolelist.Roles[left].Name, satuanKerja+":"); left++ {
+		if *assignerRolelist.Roles[left].Name == satuanKerja+":"+"Admin PPE" {
+			assignerPPE = true
+		}
+		if *assignerRolelist.Roles[left].Name == satuanKerja+":"+"Admin Agency" {
+			assignerAgency = true
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	if assignerPPE {
+		if assigneeRole == "Admin PPE" || assigneeRole == "Auditor" {
+			w.Write([]byte(`"message": "Action not allowed"`))
+		} else {
+			w.Write([]byte(`"message": "Action allowed"`))
+		}
+	} else if assignerAgency {
+		if assigneeRole == "Admin PPE" || assigneeRole == "Auditor" || assigneeRole == "Admin Agency" {
+			w.Write([]byte(`"message": "Action not allowed"`))
+		} else {
+			w.Write([]byte(`"message": "Action allowed"`))
+		}
+	} else {
+		w.Write([]byte(`"message": "Action not allowed"`))
+	}
+}
+
 func DeleteUser(w http.ResponseWriter, r *http.Request) {
 	var userinfo userInfo
 	err := json.NewDecoder(r.Body).Decode(&userinfo)
