@@ -3,6 +3,7 @@ package manager
 import (
 	"errors"
 	"fmt"
+	"strings"
 )
 
 var Hierarchy = map[string][]string{
@@ -30,9 +31,19 @@ func RoleSetup(prefix string) error {
 		return err
 	}
 
+	left, right := 0, len(rolelist.Roles)-1
+	for left < right {
+		mid := (left + right) >> 1
+		if *rolelist.Roles[mid].Name < prefix+":" {
+			left = mid + 1
+		} else {
+			right = mid
+		}
+	}
+
 	RoleID = make(map[string]string)
-	for _, role := range rolelist.Roles {
-		RoleID[*role.Name] = *role.ID
+	for ; left < len(rolelist.Roles) && strings.HasPrefix(*rolelist.Roles[left].Name, prefix+":"); left++ {
+		RoleID[*rolelist.Roles[left].Name] = *rolelist.Roles[left].ID
 	}
 
 	return nil
