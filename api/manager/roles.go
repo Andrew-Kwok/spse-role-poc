@@ -24,7 +24,6 @@ func RoleSetup(prefix string) error {
 		}
 	}
 
-	// TODO: Fix Looping, only requires looping with prefix
 	// Auth0API.Role.List() Returns a list of roles sorted by role_name.
 	rolelist, err := Auth0API.Role.List()
 	if err != nil {

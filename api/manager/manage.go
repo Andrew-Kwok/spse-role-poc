@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 
 	"github.com/auth0/go-auth0"
@@ -17,6 +18,11 @@ type userInfo struct {
 	Email    string   `json:"email"`
 	Password string   `json:"password"`
 	Roles    []string `json:"roles"`
+}
+
+type message struct {
+	Message string   `"json:message"`
+	Errors  []string `"json:errors"`
 }
 
 func CreateUserHandler(w http.ResponseWriter, r *http.Request) {
@@ -59,11 +65,6 @@ func CreateUserHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// parse messages into json
-	type message struct {
-		Message string   `"json:message"`
-		Errors  []string `"json:errors"`
-	}
-
 	var err_list_str []string
 	for _, err := range err_list {
 		err_list_str = append(err_list_str, err.Error())
@@ -131,63 +132,78 @@ func RewriteRoles(userinfo userInfo) []error {
 	return err_accumulator
 }
 
-// func AddRolesHandler(w http.ResponseWriter, r *http.Request) {
-// 	var userinfo userInfo
-// 	err := json.NewDecoder(r.Body).Decode(&userinfo)
+func AddRolesHandler(w http.ResponseWriter, r *http.Request) {
+	var userinfo userInfo
+	err := json.NewDecoder(r.Body).Decode(&userinfo)
 
-// 	if err != nil {
-// 		http.Error(w, "Invalid request body", http.StatusBadRequest)
-// 		return
-// 	}
-// 	if userinfo.ID == "" {
-// 		http.Error(w, "user id cannot be empty", http.StatusBadRequest)
-// 		return
-// 	}
-// 	if userinfo.Roles == nil || len(userinfo.Roles) == 0 {
-// 		http.Error(w, "To be added roles cannot be empty", http.StatusBadRequest)
-// 		return
-// 	}
+	if err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	if userinfo.ID == "" {
+		http.Error(w, "user id cannot be empty", http.StatusBadRequest)
+		return
+	}
+	if userinfo.Roles == nil || len(userinfo.Roles) == 0 {
+		http.Error(w, "To be added roles cannot be empty", http.StatusBadRequest)
+		return
+	}
+	sort.Strings(userinfo.Roles)
 
-// 	// get old roles for the current user, and check if the roles combined
-// 	// with the future roles will trigger and error
-// 	old_roles, err := Auth0API.User.Roles(userinfo.ID)
-// 	if err != nil {
-// 		http.Error(w, err.Error(), http.StatusInternalServerError)
-// 		return
-// 	}
+	// get old roles for the current user, and check if the roles combined
+	// with the future roles will trigger an error
+	// Only add old roles that has at least one common "satuan_kerja" as userinfo.Roles
+	// Note: old_roles is sorted by role's Name
+	old_roles, err := Auth0API.User.Roles(userinfo.ID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
-// 	old_roles_name := []string{}
-// 	for _, role := range old_roles.Roles {
-// 		old_roles_name = append(old_roles_name, *role.Name)
-// 	}
+	left_bound := 0
+	for i, role := range userinfo.Roles {
+		idx := strings.Index(role, ":")
+		if idx == -1 {
+			continue
+		}
+		satKer := role[:idx]
+		if i > 0 && strings.HasPrefix(userinfo.Roles[i-1], satKer+":") {
+			// the role is already added in the previous iteration
+			continue
+		} else {
+			left, right := left_bound, len(old_roles.Roles)-1
+			for left < right {
+				mid := (left + right) >> 1
+				if *old_roles.Roles[mid].Name < satKer+":" {
+					left = mid + 1
+				} else {
+					right = mid
+				}
+			}
+			for ; left < len(old_roles.Roles) && strings.HasPrefix(*old_roles.Roles[left].Name, satKer+":"); left++ {
+				userinfo.Roles = append(userinfo.Roles, *old_roles.Roles[left].Name)
+			}
+			// Since both old_roles and userinfo are sorted, future iterations on userinfo
+			// must be in at the greater index.
+			left_bound = left
+		}
+	}
 
-// 	err = ValidateRoles(append(old_roles_name, userinfo.Roles...))
-// 	if err != nil {
-// 		http.Error(w, err.Error(), http.StatusBadRequest)
-// 		return
-// 	}
+	err_list := RewriteRoles(userinfo)
 
-// 	// generate a []management.Role array which contains the role to be assigned
-// 	var RoleAssignment []*management.Role
-// 	for _, role := range userinfo.Roles {
-// 		role_obj, err := Auth0API.Role.Read(RoleID[role])
-// 		if err != nil {
-// 			http.Error(w, err.Error(), http.StatusInternalServerError)
-// 			return
-// 		}
-// 		RoleAssignment = append(RoleAssignment, role_obj)
-// 	}
+	// parse messages into json
+	var err_list_str []string
+	for _, err := range err_list {
+		err_list_str = append(err_list_str, err.Error())
+	}
 
-// 	err = Auth0API.User.AssignRoles(userinfo.ID, RoleAssignment)
-// 	if err != nil {
-// 		http.Error(w, err.Error(), http.StatusInternalServerError)
-// 		return
-// 	}
-
-// 	w.Header().Set("Content-Type", "application/json")
-// 	w.WriteHeader(http.StatusOK)
-// 	w.Write([]byte(fmt.Sprintf(`{"message":" Roles successfully added"}`)))
-// }
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(message{
+		Message: "Role Addition Successfully Halted. Please pay attention to the \"errors\" scope. You can ignore this message if it is empty.",
+		Errors:  err_list_str,
+	})
+}
 
 func DeleteUser(w http.ResponseWriter, r *http.Request) {
 	var userinfo userInfo
