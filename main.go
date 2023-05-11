@@ -20,7 +20,6 @@ func main() {
 	}
 
 	manager.ConnectAPI()
-	// manager.RoleSetup()
 
 	// // generate roles in auth0;
 	// available_roles := []string{"Admin PPE", "Admin Agency", "Verifikator", "Helpdesk", "PPK", "KUPBJ", "Anggota Pokmil", "PP", "Auditor"}
