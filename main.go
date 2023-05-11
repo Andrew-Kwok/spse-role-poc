@@ -8,6 +8,8 @@ import (
 	"spse-role-poc/api/manager"
 	"spse-role-poc/api/router"
 
+	// "github.com/auth0/go-auth0"
+	// "github.com/auth0/go-auth0/management"
 	"github.com/joho/godotenv"
 )
 
@@ -18,7 +20,19 @@ func main() {
 	}
 
 	manager.ConnectAPI()
-	manager.RoleSetup()
+	// manager.RoleSetup()
+
+	// // generate roles in auth0;
+	// available_roles := []string{"Admin PPE", "Admin Agency", "Verifikator", "Helpdesk", "PPK", "KUPBJ", "Anggota Pokmil", "PP", "Auditor"}
+	// for i := 1; i <= 3; i++ {
+	// 	for _, role := range available_roles {
+	// 		newRole := &management.Role{
+	// 			Name:        auth0.String("A" + strconv.Itoa(i) + ":" + role),
+	// 			Description: auth0.String("Placeholder Description"),
+	// 		}
+	// 		manager.Auth0API.Role.Create(newRole)
+	// 	}
+	// }
 
 	r := router.New()
 	port := os.Getenv("API_PORT")

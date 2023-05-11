@@ -20,7 +20,7 @@ func New() http.Handler {
 
 	// user functions
 	r.Post("/create", manager.CreateUserHandler)
-	r.Patch("/addroles", manager.AddRolesHandler)
+	// r.Patch("/addroles", manager.AddRolesHandler)
 
 	return r
 }
