@@ -22,6 +22,7 @@ func New() http.Handler {
 	r.Post("/create", manager.CreateUserHandler)
 	r.Patch("/addroles", manager.AddRolesHandler)
 	r.Patch("/rewriteroles", manager.RewriteRolesHandler)
+	r.Get("/query", manager.QueryAssignHandler)
 
 	return r
 }
