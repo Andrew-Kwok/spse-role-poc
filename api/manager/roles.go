@@ -2,7 +2,6 @@ package manager
 
 import (
 	"fmt"
-	"log"
 	"sort"
 	"strings"
 
@@ -56,11 +55,6 @@ func RetrieveRoleByNames(rolenames []string) ([]*management.Role, error) {
 	)
 	if err != nil {
 		return nil, err
-	}
-
-	log.Print(rolelist.Roles)
-	for _, role := range rolelist.Roles {
-		log.Print(*role.Name)
 	}
 
 	left_bound := 0

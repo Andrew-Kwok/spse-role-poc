@@ -75,16 +75,19 @@ func CreateUserHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	err = assignRolesHelper(*newUser.ID, userinfo.Roles)
-	if err != nil {
-		Auth0API.User.Delete(*newUser.ID)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+
+	if userinfo.Roles != nil && len(userinfo.Roles) > 0 {
+		err = assignRolesHelper(*newUser.ID, userinfo.Roles)
+		if err != nil {
+			Auth0API.User.Delete(*newUser.ID)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte(fmt.Sprintf("New user successfully creaded with ID: %s", *newUser.ID)))
+	w.Write([]byte(fmt.Sprintf(`{"message":"New user successfully creaded with ID: %s"}`, *newUser.ID)))
 }
 
 // Handler for Rewrite Roles
@@ -114,7 +117,7 @@ func RewriteRolesHandler(w http.ResponseWriter, r *http.Request) {
 			errListStr = append(errListStr, err.Error())
 		}
 
-		json.NewEncoder(w).Encode(message{
+		json.NewEncoder(w).Encode(error_message{
 			Errors: errListStr,
 		})
 		return
@@ -126,20 +129,25 @@ func RewriteRolesHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	err = Auth0API.User.RemoveRoles(userinfo.ID, old_roles.Roles)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	if old_roles.Roles != nil && len(old_roles.Roles) > 0 {
+		err = Auth0API.User.RemoveRoles(userinfo.ID, old_roles.Roles)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
-	err = assignRolesHelper(userinfo.ID, userinfo.Roles)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+
+	if userinfo.Roles != nil && len(userinfo.Roles) > 0 {
+		err = assignRolesHelper(userinfo.ID, userinfo.Roles)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte("Roles successfully updated"))
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"message": "Roles successfully updated"}`))
 }
 
 // Handler for Rewrite Roles
@@ -175,25 +183,25 @@ func AddRolesHandler(w http.ResponseWriter, r *http.Request) {
 
 	left_bound := 0
 	for i, role := range userinfo.Roles {
-		idx := strings.LastIndex(role, ":")
+		idx := strings.Index(role, ":")
 		if idx == -1 {
 			continue
 		}
-		klpd_satuanKerja := role[:idx]
-		if i > 0 && strings.HasPrefix(userinfo.Roles[i-1], satKer+":") {
+		klpd := role[:idx]
+		if i > 0 && strings.HasPrefix(userinfo.Roles[i-1], klpd+":") {
 			// the role is already added in the previous iteration
 			continue
 		} else {
 			left, right := left_bound, len(old_roles.Roles)-1
 			for left < right {
 				mid := (left + right) >> 1
-				if *old_roles.Roles[mid].Name < klpd_satuanKerjas+":" {
+				if *old_roles.Roles[mid].Name < klpd+":" {
 					left = mid + 1
 				} else {
 					right = mid
 				}
 			}
-			for ; left < len(old_roles.Roles) && strings.HasPrefix(*old_roles.Roles[left].Name, klpd_satuanKerja+":"); left++ {
+			for ; left < len(old_roles.Roles) && strings.HasPrefix(*old_roles.Roles[left].Name, klpd+":"); left++ {
 				userinfo.Roles = append(userinfo.Roles, *old_roles.Roles[left].Name)
 			}
 			// Since both old_roles and userinfo are sorted, future iterations on userinfo
@@ -213,7 +221,7 @@ func AddRolesHandler(w http.ResponseWriter, r *http.Request) {
 			errListStr = append(errListStr, err.Error())
 		}
 
-		json.NewEncoder(w).Encode(message{
+		json.NewEncoder(w).Encode(error_message{
 			Errors: errListStr,
 		})
 		return
@@ -226,8 +234,8 @@ func AddRolesHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte("Roles successfully updated"))
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"message": "Roles successfully updated"}`))
 }
 
 // A helper function to assign `rolenames` to user with user id `uid`
@@ -304,18 +312,18 @@ func QueryAssignHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	if assignerPPE {
 		if assigneeRole == "Admin PPE" || assigneeRole == "Auditor" {
-			w.Write([]byte(`"message": "Action not allowed"`))
+			w.Write([]byte(`{"message": "Action not allowed"}`))
 		} else {
-			w.Write([]byte(`"message": "Action allowed"`))
+			w.Write([]byte(`{"message": "Action allowed"}`))
 		}
 	} else if assignerAgency {
 		if assigneeRole == "Admin PPE" || assigneeRole == "Auditor" || assigneeRole == "Admin Agency" {
-			w.Write([]byte(`"message": "Action not allowed"`))
+			w.Write([]byte(`{"message": "Action not allowed"}`))
 		} else {
-			w.Write([]byte(`"message": "Action allowed"`))
+			w.Write([]byte(`{"message": "Action allowed"}`))
 		}
 	} else {
-		w.Write([]byte(`"message": "Action not allowed"`))
+		w.Write([]byte(`{"message": "Action not allowed"}`))
 	}
 }
 
@@ -334,6 +342,6 @@ func DeleteUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
+	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(fmt.Sprintf(`{"message":"Successfully deleted user"`)))
 }
