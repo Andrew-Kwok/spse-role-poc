@@ -20,18 +20,25 @@ func main() {
 	}
 
 	manager.ConnectAPI()
+	manager.RoleSetup()
 
 	// // generate roles in auth0;
 	// available_roles := []string{"Admin PPE", "Admin Agency", "Verifikator", "Helpdesk", "PPK", "KUPBJ", "Anggota Pokmil", "PP", "Auditor"}
-	// for i := 1; i <= 3; i++ {
-	// 	for _, role := range available_roles {
-	// 		newRole := &management.Role{
-	// 			Name:        auth0.String("A" + strconv.Itoa(i) + ":" + role),
-	// 			Description: auth0.String("Placeholder Description"),
+	// for ch := 'A'; ch <= 'B'; ch++ {
+	// 	for i := 1; i <= 3; i++ {
+	// 		for _, role := range available_roles {
+	// 			KLPD := string(ch)
+	// 			satuanKerja := "A" + strconv.Itoa(i)
+	// 			roleFunction := role
+	// 			newRole := &management.Role{
+	// 				Name:        auth0.String(KLPD + ":" + satuanKerja + ":" + roleFunction),
+	// 				Description: auth0.String("Placeholder Description"),
+	// 			}
+	// 			manager.Auth0API.Role.Create(newRole)
 	// 		}
-	// 		manager.Auth0API.Role.Create(newRole)
 	// 	}
 	// }
+	// return
 
 	r := router.New()
 	port := os.Getenv("API_PORT")

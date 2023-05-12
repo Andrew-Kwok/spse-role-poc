@@ -20,11 +20,14 @@ type userInfo struct {
 	Roles    []string `json:"roles"`
 }
 
-type message struct {
-	Message string   `"json:message"`
-	Errors  []string `"json:errors"`
+// struct to store a list of error message
+type error_message struct {
+	Errors []string `"json:errors"`
 }
 
+// Handler for New User Creation
+// Requires `email` and `password` input from the request body
+// Will create a new user with `roles` if the field is filled.
 func CreateUserHandler(w http.ResponseWriter, r *http.Request) {
 	var userinfo userInfo
 	err := json.NewDecoder(r.Body).Decode(&userinfo)
@@ -49,89 +52,44 @@ func CreateUserHandler(w http.ResponseWriter, r *http.Request) {
 		Password:   auth0.String(userinfo.Password),
 	}
 
+	errList := ValidateRoles(userinfo.Roles)
+	if errList != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+
+		// parse messages into json
+		var errListStr []string
+		for _, err := range errList {
+			errListStr = append(errListStr, err.Error())
+		}
+
+		json.NewEncoder(w).Encode(error_message{
+			Errors: errListStr,
+		})
+		return
+	}
+
 	// Create a new user
 	err = Auth0API.User.Create(newUser)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	err = assignRolesHelper(*newUser.ID, userinfo.Roles)
+	if err != nil {
+		Auth0API.User.Delete(*newUser.ID)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-
-	var err_list []error = nil
-	if userinfo.Roles != nil && len(userinfo.Roles) > 0 {
-		userinfo.ID = *newUser.ID
-		err_list = RewriteRoles(userinfo)
-	}
-
-	// parse messages into json
-	var err_list_str []string
-	for _, err := range err_list {
-		err_list_str = append(err_list_str, err.Error())
-	}
-
-	json.NewEncoder(w).Encode(message{
-		Message: fmt.Sprintf("New user successfully creaded with ID: %s", *newUser.ID),
-		Errors:  err_list_str,
-	})
+	w.Write([]byte(fmt.Sprintf("New user successfully creaded with ID: %s", *newUser.ID)))
 }
 
-func RewriteRoles(userinfo userInfo) []error {
-	// Note: Role Existence is checked in RoleSetup(prefix)
-	role_by_prefix := make(map[string][]string)
-	for _, role := range userinfo.Roles {
-		idx := strings.Index(role, ":")
-		if idx == -1 {
-			return []error{fmt.Errorf("Role %s is not in correct format", role)}
-		}
-
-		role_prefix, role_suffix := role[:idx], role[idx+1:]
-		role_by_prefix[role_prefix] = append(role_by_prefix[role_prefix], role_suffix)
-	}
-
-	var err_accumulator []error = make([]error, 0)
-	for prefix, roles_suffix := range role_by_prefix {
-		err := RoleSetup(prefix)
-		if err != nil {
-			err_accumulator = append(err_accumulator, err)
-			continue
-		}
-
-		err = ValidateRoles(prefix, roles_suffix)
-		if err != nil {
-			err_accumulator = append(err_accumulator, err)
-			continue
-		}
-
-		// generate a []management.Role array which contains the role to be assigned
-		retrieve_role_info_ok := true
-		var RoleAssignment []*management.Role
-		for _, role_suffix := range roles_suffix {
-			role_obj, err := Auth0API.Role.Read(RoleID[prefix+":"+role_suffix])
-			if err != nil {
-				retrieve_role_info_ok = false
-				err_accumulator = append(err_accumulator, err)
-				break
-			}
-			RoleAssignment = append(RoleAssignment, role_obj)
-		}
-
-		if !retrieve_role_info_ok {
-			continue
-		}
-
-		err = Auth0API.User.AssignRoles(userinfo.ID, RoleAssignment)
-		if err != nil {
-			err_accumulator = append(err_accumulator, err)
-		}
-	}
-
-	if len(err_accumulator) == 0 {
-		return nil
-	}
-	return err_accumulator
-}
-
+// Handler for Rewrite Roles
+// Requires `id` of user and `roles` as part of request body
+// will update the roles of user if `roles` is a valid configuration, or do nothing otherwise
 func RewriteRolesHandler(w http.ResponseWriter, r *http.Request) {
 	var userinfo userInfo
 	err := json.NewDecoder(r.Body).Decode(&userinfo)
@@ -145,30 +103,48 @@ func RewriteRolesHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	errList := ValidateRoles(userinfo.Roles)
+	if errList != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+
+		// parse messages into json
+		var errListStr []string
+		for _, err := range errList {
+			errListStr = append(errListStr, err.Error())
+		}
+
+		json.NewEncoder(w).Encode(message{
+			Errors: errListStr,
+		})
+		return
+	}
+
+	// Remove all old roles
 	old_roles, err := Auth0API.User.Roles(userinfo.ID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	Auth0API.User.RemoveRoles(userinfo.ID, old_roles.Roles)
-	err_list := RewriteRoles(userinfo)
-
-	// parse messages into json
-	var err_list_str []string
-	for _, err := range err_list {
-		err_list_str = append(err_list_str, err.Error())
+	err = Auth0API.User.RemoveRoles(userinfo.ID, old_roles.Roles)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	err = assignRolesHelper(userinfo.ID, userinfo.Roles)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(message{
-		Message: "Role Rewriting Successfully Halted. Please pay attention to the \"errors\" scope. You can ignore this message if it is empty.",
-		Errors:  err_list_str,
-	})
-
+	w.WriteHeader(http.StatusCreated)
+	w.Write([]byte("Roles successfully updated"))
 }
 
+// Handler for Rewrite Roles
+// Requires `id` of user and `roles` as part of request body
+// will update the roles of user if `roles` is a valid configuration, or do nothing otherwise
 func AddRolesHandler(w http.ResponseWriter, r *http.Request) {
 	var userinfo userInfo
 	err := json.NewDecoder(r.Body).Decode(&userinfo)
@@ -199,11 +175,11 @@ func AddRolesHandler(w http.ResponseWriter, r *http.Request) {
 
 	left_bound := 0
 	for i, role := range userinfo.Roles {
-		idx := strings.Index(role, ":")
+		idx := strings.LastIndex(role, ":")
 		if idx == -1 {
 			continue
 		}
-		satKer := role[:idx]
+		klpd_satuanKerja := role[:idx]
 		if i > 0 && strings.HasPrefix(userinfo.Roles[i-1], satKer+":") {
 			// the role is already added in the previous iteration
 			continue
@@ -211,13 +187,13 @@ func AddRolesHandler(w http.ResponseWriter, r *http.Request) {
 			left, right := left_bound, len(old_roles.Roles)-1
 			for left < right {
 				mid := (left + right) >> 1
-				if *old_roles.Roles[mid].Name < satKer+":" {
+				if *old_roles.Roles[mid].Name < klpd_satuanKerjas+":" {
 					left = mid + 1
 				} else {
 					right = mid
 				}
 			}
-			for ; left < len(old_roles.Roles) && strings.HasPrefix(*old_roles.Roles[left].Name, satKer+":"); left++ {
+			for ; left < len(old_roles.Roles) && strings.HasPrefix(*old_roles.Roles[left].Name, klpd_satuanKerja+":"); left++ {
 				userinfo.Roles = append(userinfo.Roles, *old_roles.Roles[left].Name)
 			}
 			// Since both old_roles and userinfo are sorted, future iterations on userinfo
@@ -226,20 +202,50 @@ func AddRolesHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	err_list := RewriteRoles(userinfo)
+	errList := ValidateRoles(userinfo.Roles)
+	if errList != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
 
-	// parse messages into json
-	var err_list_str []string
-	for _, err := range err_list {
-		err_list_str = append(err_list_str, err.Error())
+		// parse messages into json
+		var errListStr []string
+		for _, err := range errList {
+			errListStr = append(errListStr, err.Error())
+		}
+
+		json.NewEncoder(w).Encode(message{
+			Errors: errListStr,
+		})
+		return
+	}
+
+	err = assignRolesHelper(userinfo.ID, userinfo.Roles)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(message{
-		Message: "Role Addition Successfully Halted. Please pay attention to the \"errors\" scope. You can ignore this message if it is empty.",
-		Errors:  err_list_str,
-	})
+	w.WriteHeader(http.StatusCreated)
+	w.Write([]byte("Roles successfully updated"))
+}
+
+// A helper function to assign `rolenames` to user with user id `uid`
+//
+// Preconditions:
+// - all roles in rolenames are valid role
+// - a single user with all roles in rolenames does not violate the role rule.
+func assignRolesHelper(uid string, rolenames []string) error {
+	roles, err := RetrieveRoleByNames(rolenames)
+	if err != nil {
+		return err
+	}
+
+	err = Auth0API.User.AssignRoles(uid, roles)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func QueryAssignHandler(w http.ResponseWriter, r *http.Request) {
