@@ -24,6 +24,8 @@ func setup(t *testing.T) {
 	manager.RoleSetup()
 }
 
+// Takes `email`, `password,` and `roles` as input, then tries the CreateUserHandler
+// to see if it created a new user as expected
 func testCreateHelper(t *testing.T, data map[string]interface{}, expectedStatus int) string {
 	server := httptest.NewServer(http.HandlerFunc(manager.CreateUserHandler))
 	defer server.Close()
@@ -72,6 +74,8 @@ func testCreateHelper(t *testing.T, data map[string]interface{}, expectedStatus 
 	return ""
 }
 
+// Takes `user_id`, and `roles` as input, then tries the AddRolesHandler or RewriteRolesHandler
+// to see if it updated the roles of the user as expected
 func testPatchHelper(t *testing.T, command string, data map[string]interface{}, expectedStatus int) {
 	server := httptest.NewServer(http.HandlerFunc(manager.AddRolesHandler))
 	if command == "rewriteroles" {
@@ -108,6 +112,7 @@ func testPatchHelper(t *testing.T, command string, data map[string]interface{}, 
 	}
 }
 
+// Check if the roles of user with <uid> in Auth0 has the same roles as expectedRoles
 func checkRoles(t *testing.T, uid string, expectedRoles []string) error {
 	rolelist, err := manager.Auth0API.User.Roles(uid)
 	if err != nil {
