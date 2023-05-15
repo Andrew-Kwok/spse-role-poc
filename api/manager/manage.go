@@ -327,6 +327,7 @@ func QueryAssignHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Handler for deleting user based on userid
 func DeleteUser(w http.ResponseWriter, r *http.Request) {
 	var userinfo userInfo
 	err := json.NewDecoder(r.Body).Decode(&userinfo)

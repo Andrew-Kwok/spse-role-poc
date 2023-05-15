@@ -6,6 +6,7 @@ import (
 	"github.com/go-chi/chi"
 
 	"spse-role-poc/api/manager"
+	"spse-role-poc/api/middleware"
 )
 
 func New() http.Handler {
@@ -22,7 +23,12 @@ func New() http.Handler {
 	r.Post("/create", manager.CreateUserHandler)
 	r.Patch("/addroles", manager.AddRolesHandler)
 	r.Patch("/rewriteroles", manager.RewriteRolesHandler)
-	// r.Get("/query", manager.QueryAssignHandler)
+
+	r.Route("/", func(r chi.Router) {
+		r.Use(middleware.ValidateRoles)
+		// r.Use(middleware.EnsureValidToken())
+		r.Post("/create-protected", manager.CreateUserHandler)
+	})
 
 	return r
 }
