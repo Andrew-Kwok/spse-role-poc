@@ -1,3 +1,6 @@
+# ARCHIVED
+POC is moved to https://github.com/Andrew-Kwok/spse-role-poc-2
+
 # spse-role-poc
 
 Fill `MGMT_ACCESS_TOKEN=` in `.env`. This can be obtained from Auth0 > APIs > Auth0 Management API > API Explorer.
